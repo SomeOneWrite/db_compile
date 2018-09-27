@@ -1,4 +1,6 @@
 
 from FolderWalker import FolderWalker
 
-FolderWalker(r'C:\Users\Rinat\Desktop\крым')
+FolderWalker(r'крым').model.db_connection.commit()
+
+print('result')

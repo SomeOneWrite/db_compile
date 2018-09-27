@@ -1,7 +1,7 @@
 import os
 import sqlite3
 from docx import Document
-from Parsers import ParseWorkers
+
 
 query_create_tables = [
     'CREATE TABLE dirs ( id integer primary key autoincrement, parent_id integer references dirs(id) on delete cascade on update cascade, name text )',
@@ -34,26 +34,26 @@ class Model:
                 self.db_connection.commit()
         print("Database and tables created")
 
+    def insert_caption(self, collection_id: int, parent_id: int, name: str):
+        # print('insert caption: coll_id = {}     parent_id = {}     name = {}'.format(collection_id, parent_id, name))
+        return self.db_cursor.execute('insert into captions (collection_id, parent_id, name) values(?, ?, ?)',
+                                      (collection_id, parent_id, name)).lastrowid
 
-    def insert_dir(self, dir_name, dir_id):
-        return self.db_cursor.execute('insert into dirs(parent_id, name) values(?, ?)', (dir_id, dir_name))
+    def insert_collection(self, dir_id: int, type: int, name: str, tech_part: str):
+    #     print('insert collection: dir_id = {} name = {}'.format(dir_id, name))
+        return self.db_cursor.execute('insert into collections (dir_id, type, name, techpart) values(?, ?, ?, ?)',
+                                      (dir_id, type, name, tech_part)).lastrowid
 
-    def parse_file(self, filename : str, ):
-        doc = Document(filename)
-        if filename.endswith("workers.docx"):
-            ParseWorkers.ParseWorkers(self.db_cursor).run(doc)
-            return
-        if filename.endswith("transports.docx"):
-            ParseWorkers.ParseWorkers(self.db_cursor).run(doc)
-            return
-        if filename.endswith("machines.docx"):
-            ParseWorkers.ParseWorkers(self.db_cursor).run(doc)
-            return
-        if filename.endswith("materials.docx"):
-            ParseWorkers.ParseWorkers(self.db_cursor).run(doc)
-            return
+    def insert_dir(self, parent_id: int, name: str):
+        # print('insert parent_id: parent_id = {}      name = {}'.format(parent_id, name))
+        return self.db_cursor.execute('insert into dirs(parent_id, name) values(?, ?)', (parent_id, name)).lastrowid
 
-        pass
-
-
+    def insert_unit_position(self, id: str, name:str, unit:str, cost_workers:str, cost_machines: str, cost_drivers: str,
+                             cost_materials: str, caption_id: int):
+        print('insert unit_position: id = {} name = {}'.format(id, name))
+        return \
+            self.db_cursor.execute("insert into unit_positions"
+                                      "(id, name, unit, cost_workers, cost_machines, cost_drivers, cost_materials, caption_id) "
+                                      "values(?, ?, ?, ?, ?, ?, ?, ?)",
+                                   (id, name, unit, cost_workers, cost_machines, cost_drivers, cost_materials, caption_id)).lastrowid
 
