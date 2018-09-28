@@ -1,5 +1,5 @@
 from docx import Document
-from Model import Model
+from Model import FileModel, SqlModel
 import re
 import pdb
 from Parsers import ParseWorkers
@@ -7,10 +7,13 @@ from Helpers import to_float, to_float_or_zero
 
 
 class Parse:
-    def __init__(self, model: Model):
+    def __init__(self, model):
         self.model = model
         self.last_id = None
         self.collection_id = None
+        self.table_aligment_id = {
+
+        }
 
     def run(self, doc: Document, collection_id: int):
         self.collection_id = collection_id
@@ -50,9 +53,23 @@ class Parse:
             return result.group(1)
         return None
 
+    def check_table_aligment(self, row):
+        for cell in row.cells:
+            result = re.sub(r'\d*', '', cell.text).strip()
+            if result != '':
+                return
+        for cell in range(0, len(row.cells)):
+            result = row.cells[cell].text.strip()
+            self.table_aligment_id[result] = cell
+
+
+
+
     def parse_unit_position(self, table, row_i):
+        addon_string = ''
         rows = table.rows
-        for row in range(row_i, len(rows)):
+        row = row_i
+        while row < len(rows):
             cells = rows[row].cells
             for cell in range(0, len(cells)):
                 cell_text = rows[row].cells[cell].text
@@ -64,56 +81,103 @@ class Parse:
                     return row
 
             if cells[0].text == cells[1].text == cells[2].text == cells[3].text:
-                self.addon_string = cells[0].text
-            else:
-                self.addon_string = ''
+                addon_string = cells[0].text
+                row += 1
+                continue
             if len(rows[row].cells) > 7:
                 iden = cells[0].text
                 if to_float(iden):
+                    row += 1
                     continue
-                name = self.addon_string + cells[1].text
-                cost_workers = to_float_or_zero(cells[3].text)
                 if not to_float(cells[2].text):
+                    if cells[0].text.strip() == '':
+                        txt_all = ''
+                        last_str = ''
+                        for i in range(0, 4):
+                            for j in range(0, 4):
+                                txt = rows[row + i].cells[j].text
+                                result = re.search(r'\d\d-\d\d-\d\d\d-\d\d', txt)
+                                if result:
+                                    row += i
+                                    break
+                                if txt != last_str:
+                                    txt_all += txt
+                                last_str = txt
+                            else:
+                                continue
+                            break
+                        txt_all = re.sub(r'\n', '', txt_all)
+                        txt_all = re.sub(r'\t', '', txt_all)
+                        addon_string = txt_all
+                        continue
+                name = addon_string + cells[1].text
+                result = re.search(r'\d\d-\d\d-\d\d\d-\d\d', iden)
+                if not result:
+                    row += 1
                     continue
-                cost_machines = to_float_or_zero(cells[4].text)
-                cost_drivers = to_float_or_zero(cells[5].text)
-                cost_materials = to_float_or_zero(cells[6].text)
+                cost_workers = to_float_or_zero(cells[self.table_aligment_id['4']].text)
+
+                cost_machines = to_float_or_zero(cells[self.table_aligment_id['5']].text)
+                cost_drivers = to_float_or_zero(cells[self.table_aligment_id['6']].text)
+                cost_materials = to_float_or_zero(cells[self.table_aligment_id['7']].text)
                 self.model.insert_unit_position(iden, name, self.unit_name, cost_workers, cost_machines, cost_drivers,
                                                 cost_materials, self.last_table_id)
+            row += 1
+        return row - 2
 
-    return row
 
-
-def parse_caption(self, table):
-    rows = table.rows
-    for row in range(0, len(rows)):
-        cells = rows[row].cells
-        for cell in range(0, len(cells)):
-            text = cells[cell].text
-            text_all = ' '
-            for i in cells:
-                text_all += i.text
-            text_all = re.sub(r'\n', '', text_all)
-            text_all = re.sub(r'\t', '', text_all)
-            if self.check_razdel(text_all) and not self.check_podrazdel(text_all):
-                self.last_id = self.model.insert_caption(self.collection_id, None, text)
-                break
-            elif self.check_podrazdel(text_all):
-                self.last_id = self.model.insert_caption(self.collection_id, self.last_id, text)
-                break
-            elif self.check_table_name(text_all):
-
-                table_name = re.sub(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', '', text, re.IGNORECASE)
-                table_name = re.sub(r'\t', '', table_name)
-                table_name = re.sub(r'\n', '', table_name)
-                self.last_table_id = self.model.insert_caption(self.collection_id, self.last_id, table_name)
-                self.unit_name = self.get_unit(text_all)
-                if self.unit_name:
-                    row = self.parse_unit_position(table, row + 1)
-                    cells = rows[row].cells
+    def parse_caption(self, table):
+        rows = table.rows
+        row = 0
+        while row < len(rows):
+            cells = rows[row].cells
+            for cell in range(0, len(cells)):
+                cells = rows[row].cells
+                text = cells[cell].text
+                text_all = ' '
+                for i in cells:
+                    text_all += i.text
+                text_all = re.sub(r'\n', '', text_all)
+                text_all = re.sub(r'\t', '', text_all)
+                self.check_table_aligment(rows[row])
+                if self.check_razdel(text_all) and not self.check_podrazdel(text_all):
+                    self.last_id = self.model.insert_caption(self.collection_id, None, text)
+                    row += 1
                     break
+                elif self.check_podrazdel(text_all):
+                    self.last_id = self.model.insert_caption(self.collection_id, self.last_id, text)
+                    row += 1
+                    break
+                elif self.check_table_name(text_all):
+                    table_name = re.sub(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', '', text, re.IGNORECASE)
+                    table_name = re.sub(r'\t', '', table_name)
+                    table_name = re.sub(r'\n', '', table_name)
+                    self.unit_name = self.get_unit(text_all)
+                    if self.unit_name:
+                        self.last_table_id = self.model.insert_caption(self.collection_id, self.last_id, table_name)
+                        row = self.parse_unit_position(table, row + 1)
+                        cells = rows[row].cells
+                        break
+                    else:
+                        table_name = ''
+                        for i in range(0, 2):
+                            for j in range(0, 3):
+                                table_name += rows[row + i].cells[j].text
+                        table_name = re.sub(r'\n', '', table_name)
+                        table_name = re.sub(r'\t', '', table_name)
+                        self.unit_name = self.get_unit(table_name)
+                        if self.unit_name:
+                            table_name = re.sub(r'(\s*Измеритель:\s*\d{0,10}\s?\b(\w*)\b\s*)', '', table_name,
+                                                    re.IGNORECASE)
+                            self.last_table_id = self.model.insert_caption(self.collection_id, self.last_id, table_name)
+                            row = self.parse_unit_position(table, row + 1)
+                            cells = rows[row].cells
+                            break
+                        else:
+                            self.model.commit()
+                            print('text_all = {}'.format(text_all))
+                            exit(0)
+                            pdb.set_trace()
                 else:
-                    self.model.db_connection.commit()
-                    print('text_all = {}'.format(text_all))
-                    exit(0)
-                    pdb.set_trace()
+                    row += 1
+                    break

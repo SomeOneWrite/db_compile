@@ -1,6 +1,7 @@
 import os
 import sqlite3
 from docx import Document
+import json
 
 
 query_create_tables = [
@@ -15,7 +16,53 @@ query_create_tables = [
     'CREATE TABLE workers ( id text not null, name text, unit text, price real, caption_id integer references captions(id) on delete set null on update cascade, primary key(id) )',
 ]
 
-class Model:
+
+class FileModel:
+    def __init__(self, db_name):
+        self.db_name = db_name
+        self.tables = {}
+        self.init_db()
+        self.last_caption_id = 1
+        self.last_collection_id = 1
+        self.last_dir_id = 1
+        self.last_unit_position_id = 1
+
+    def init_db(self):
+        if os.path.exists(self.db_name):
+            os.remove(self.db_name)
+        print("Database and tables created")
+
+    def insert_caption(self, collection_id: int, parent_id: int, name: str):
+        # print('insert caption: coll_id = {}     parent_id = {}     name = {}'.format(collection_id, parent_id, name))
+        self.tables[self.last_caption_id] = [collection_id, parent_id, name]
+        self.last_caption_id += 1
+        return self.last_caption_id
+
+    def insert_collection(self, dir_id: int, type: int, name: str, tech_part: str):
+        self.tables[self.last_collection_id] = [dir_id, type, name, tech_part]
+        self.last_collection_id += 1
+        return self.last_collection_id
+
+    def insert_dir(self, parent_id: int, name: str):
+        self.tables[self.last_dir_id] = [parent_id, name]
+        self.last_dir_id += 1
+        return self.last_dir_id
+
+    def insert_unit_position(self, id: str, name:str, unit:str, cost_workers:str, cost_machines: str, cost_drivers: str,
+                             cost_materials: str, caption_id: int):
+        self.tables[self.last_unit_position_id] = [id, name, unit, cost_workers, cost_machines, cost_drivers, cost_materials, caption_id]
+        self.last_unit_position_id += 1
+        return self.last_unit_position_id
+
+    def commit(self):
+        with open(self.db_name, 'w', encoding='utf-8') as f:
+            json.dump(self.tables, f, ensure_ascii=False)
+
+    def __del__(self):
+        self.commit()
+
+
+class SqlModel:
     def __init__(self, db_name):
         self.db_name = db_name
         self.init_db()
@@ -50,10 +97,15 @@ class Model:
 
     def insert_unit_position(self, id: str, name:str, unit:str, cost_workers:str, cost_machines: str, cost_drivers: str,
                              cost_materials: str, caption_id: int):
-        print('insert unit_position: id = {} name = {}'.format(id, name))
+        print('insert unit_position: id = {} w = {}  m = {} d = {} m = {}'.format(id, cost_workers, cost_machines, cost_drivers, cost_materials))
         return \
             self.db_cursor.execute("insert into unit_positions"
                                       "(id, name, unit, cost_workers, cost_machines, cost_drivers, cost_materials, caption_id) "
                                       "values(?, ?, ?, ?, ?, ?, ?, ?)",
                                    (id, name, unit, cost_workers, cost_machines, cost_drivers, cost_materials, caption_id)).lastrowid
+    def commit(self):
+        self.db_connection.commit()
+
+    def __del__(self):
+        self.commit()
 

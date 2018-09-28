@@ -1,6 +1,6 @@
 
 from FolderWalker import FolderWalker
 
-FolderWalker(r'крым').model.db_connection.commit()
+FolderWalker(r'крым')
 
 print('result')

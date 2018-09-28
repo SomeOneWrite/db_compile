@@ -1,17 +1,37 @@
 import os
-import Model
+from Model import FileModel, SqlModel
 from Parsers.ParseCollection import Parse
+
+
+from threading import Thread
 from docx import Document
 import json
 
+class CollectionThread(Thread):
+
+    def __init__(self, filename, doc_filename, dir_id, collection_type):
+        self.filename = filename
+        self.doc_filename = doc_filename
+        self.dir_id = dir_id
+        self.collection_type = collection_type
+        Thread.__init__(self)
+
+    def run(self):
+        model = FileModel(self.filename + '.json')
+        collection_id = model.insert_collection(self.dir_id, self.collection_type, self.doc_filename, '')
+        model.commit()
+        parser = Parse(model)
+        doc = Document(self.filename)
+        parser.run(doc, collection_id)
+        print('Start process')
+        model.commit()
+
 class FolderWalker:
     def __init__(self, root_folder):
-        self.model = Model.Model("result.sqlite")
-        self.parser = Parse(self.model)
         self.root_folder = root_folder
         self.walk(root_folder)
         self.current_collection_type = None
-        pass
+        self.threads = {}
 
     def walk(self, folder, dir_id=None):
         for file in os.listdir(folder):
@@ -21,14 +41,16 @@ class FolderWalker:
                     config_file = json.load(f)
                     self.current_collection_type = config_file['type']
                     print('collection type: {}'.format(self.current_collection_type))
+                if self.current_collection_type != 2:
+                    continue
                 print("File {}".format(file))
-                collection_id = self.model.insert_collection(dir_id, self.current_collection_type, file, '')
-                doc = Document(os.path.join(folder, file))
-                self.parser.run(doc, collection_id)
-                self.model.db_connection.commit()
-
+                if len(self.threads) < 5:
+                    my_thread = CollectionThread(os.path.join(folder, file), file, dir_id, self.current_collection_type)
+                    my_thread.start()
+                    self.threads[file] = my_thread
                 continue
             if os.path.isdir(os.path.join(folder, file)):
                 print("Folder {}".format(os.path.join(folder, file)))
-                last_dir_id = self.model.insert_dir(dir_id, file)
+                last_dir_id = 0
                 self.walk(os.path.join(folder, file), last_dir_id)
+
