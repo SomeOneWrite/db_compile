@@ -12,11 +12,9 @@ model = SqlModel('result.sqlite')
 def process(args):
     print("Start process with filename: {}\n".format(args[0]))
     collection_id = model.insert_collection(args[2], args[3], args[1], '')
-    if args[3] != 2:
-        return
     parser = Parse(model)
     doc = Document(args[0])
-    parser.run(doc, collection_id, id_prefix=args[4])
+    parser.run(doc, collection_id, id_prefix=args[4], collection_type=args[3])
     model.commit()
 
 for data in thread_data:

@@ -105,6 +105,34 @@ class SqlModel:
                                       "(id, name, unit, cost_workers, cost_machines, cost_drivers, cost_materials, caption_id) "
                                       "values(?, ?, ?, ?, ?, ?, ?, ?)",
                                    (id, name, unit, cost_workers, cost_machines, cost_drivers, cost_materials, caption_id)).lastrowid
+
+    def insert_material(self, id : str, name: str, unit: str, cost: float, cost_smeta: float, caption_id: int):
+        print('insert material: id = {} name = {}  unit = {} cost = {} cost_vacantion = {}, caption_id = {}'.format(id, name, unit,
+                                                                                  cost, cost_smeta, caption_id))
+        return \
+                self.db_cursor.execute("insert into materials"
+                                       "(id, name, unit, price, price_vacantion, caption_id) "
+                                       "values(?, ?, ?, ?, ?, ?)",
+                                       (id, name, unit, cost, cost_smeta, caption_id)).lastrowid
+
+    def insert_transport(self, id: str, name: str, unit: str, price: float, type: str, caption_id: int):
+        print('insert transport: id = {} name = {}  unit = {} price = {} type = {}, caption_id = {}'.format(
+            id, name, unit, price, type, caption_id)
+        )
+        return \
+                self.db_cursor.execute('insert into transports'
+                                       '(id, name, unit, price, type, caption_id)'
+                                       'values(?, ?, ?, ?, ?, ?)',
+                                       (id, name, unit, price, type, caption_id)).lastrowid
+
+    def insert_machine(self, id: str, name: str, unit:str, price: float, price_driver: float, caption_id: str):
+        print('insert machines id = {}, name = {}, unit = {}, price = {}, price_driver = {}, caption_id = {}'.format(id, name, unit, price, price_driver, caption_id))
+        return \
+            self.db_cursor.execute('insert into machines'
+                                   '(id, name, unit, price, price_driver, caption_id)'
+                                   'values(?, ?, ?, ?, ?, ?)',
+                                   (id, name, unit, price, price_driver, caption_id)).lastrowid
+
     def commit(self):
         self.db_connection.commit()
 

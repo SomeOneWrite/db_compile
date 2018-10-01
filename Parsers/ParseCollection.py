@@ -2,8 +2,10 @@ from docx import Document
 from Model import FileModel, SqlModel
 import re
 import pdb
-from Parsers import ParseWorkers
 from Helpers import to_float, to_float_or_zero
+from Parsers.ParseMachines import ParseMachines
+from Parsers.ParseMaterials import ParseMaterials
+from Parsers.ParseTransports import ParseTransports
 
 
 class Parse:
@@ -12,12 +14,21 @@ class Parse:
         self.last_id = None
         self.collection_id = None
         self.table_aligment_id = {
-
         }
 
-    def run(self, doc: Document, collection_id: int, id_prefix: str):
+    def run(self, doc: Document, collection_id: int, id_prefix: str, collection_type : int):
         self.collection_id = collection_id
         self.id_prefix = id_prefix
+        self.collection_type = collection_type
+        if collection_type == 6:
+            ParseTransports(self.model).run(doc, collection_id, id_prefix, collection_type)
+            return
+        if collection_type == 3:
+            ParseMachines(self.model).run(doc, collection_id, id_prefix, collection_type)
+            return
+        if collection_type == 42:
+            ParseMaterials(self.model).run(doc, collection_id, id_prefix, collection_type)
+            return
         count = 0
         for table in range(0, len(doc.tables)):
             self.parse_caption(doc.tables[table])
@@ -25,6 +36,14 @@ class Parse:
 
     def get_unit(self, row_str):
         result = re.search(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', row_str, re.IGNORECASE)
+        if result:
+            return result.group(1)
+        return None
+
+    def check_otdel(self, row_str: str):
+        row_str = re.sub(r'\n', '', row_str)
+        row_str = re.sub(r'\t', '', row_str)
+        result = re.search(r'(Отдел\s?\d{1,2}(.*?))$', row_str, re.IGNORECASE)
         if result:
             return result.group(1)
         return None
@@ -49,6 +68,26 @@ class Parse:
 
     def check_table_name(self, row_str: str):
         result = re.search(r'(Таблица\s?\d?)', row_str, re.IGNORECASE)
+        if result:
+            return result.group(1)
+        return None
+
+    def check_chapter(self, row_str: str):
+        result = re.search(r'(Часть\s\d{1,3}\W)', row_str, re.IGNORECASE)
+        if result:
+            return result.group(1)
+        return None
+
+    def check_kniga(self, row_str: str):
+        row_str = re.sub(r'\n', '', row_str)
+        row_str = re.sub(r'\t', '', row_str)
+        result = re.search(r'(Книга(.*?)$)', row_str, re.IGNORECASE)
+        if result:
+            return result.group(1)
+        return None
+
+    def check_gruppa(self, row_str: str):
+        result = re.search(r'((Группа(.*?))$)', row_str, re.IGNORECASE)
         if result:
             return result.group(1)
         return None
@@ -80,46 +119,82 @@ class Parse:
                 if self.check_table_name(cell_text):
                     return row
 
-            if cells[0].text == cells[1].text == cells[2].text == cells[3].text:
+            if cells[0].text == cells[1].text:
                 addon_string = cells[0].text
                 continue
-            if len(rows[row].cells) > 7:
-                iden = cells[0].text
-                if to_float(iden):
-                    continue
-                if not to_float(cells[2].text):
-                    if cells[0].text.strip() == '':
-                        txt_all = ''
-                        last_str = ''
-                        for i in range(0, 4):
-                            for j in range(0, 4):
-                                txt = rows[row + i].cells[j].text
-                                result = re.search(r'\d\d-\d\d-\d\d\d-\d\d', txt)
-                                if result:
-                                    continue_n = i
-                                    break
-                                if txt != last_str:
-                                    txt_all += txt
-                                last_str = txt
-                            else:
-                                continue
-                            break
-                        txt_all = re.sub(r'\n', '', txt_all)
-                        txt_all = re.sub(r'\t', '', txt_all)
-                        addon_string = txt_all
+            if self.collection_type == 2:
+                if len(rows[row].cells) > 7:
+                    iden = cells[0].text
+                    if to_float(iden):
                         continue
-                name = addon_string + cells[1].text
-                result = re.search(r'\d\d-\d\d-\d\d\d-\d\d', iden)
-                if not result:
-                    continue
-                iden = self.id_prefix + iden
-                cost_workers = to_float_or_zero(cells[self.table_aligment_id['4']].text)
+                    if not to_float(cells[2].text):
+                        if cells[0].text.strip() == '':
+                            txt_all = ''
+                            last_str = ''
+                            for i in range(0, 4):
+                                for j in range(0, 4):
+                                    txt = rows[row + i].cells[j].text
+                                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))', txt)
+                                    if result:
+                                        continue_n = i
+                                        break
+                                    if txt != last_str:
+                                        txt_all += txt
+                                    last_str = txt
+                                else:
+                                    continue
+                                break
+                            txt_all = re.sub(r'\n', '', txt_all)
+                            txt_all = re.sub(r'\t', '', txt_all)
+                            addon_string = txt_all
+                            continue
+                    name = addon_string + cells[1].text
+                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))', iden)
+                    if not result:
+                        continue
+                    iden = self.id_prefix + iden
+                    cost_workers = to_float_or_zero(cells[self.table_aligment_id['4']].text)
 
-                cost_machines = to_float_or_zero(cells[self.table_aligment_id['5']].text)
-                cost_drivers = to_float_or_zero(cells[self.table_aligment_id['6']].text)
-                cost_materials = to_float_or_zero(cells[self.table_aligment_id['7']].text)
-                self.model.insert_unit_position(iden, name, self.unit_name, cost_workers, cost_machines, cost_drivers,
-                                                cost_materials, self.last_table_id)
+                    cost_machines = to_float_or_zero(cells[self.table_aligment_id['5']].text)
+                    cost_drivers = to_float_or_zero(cells[self.table_aligment_id['6']].text)
+                    cost_materials = to_float_or_zero(cells[self.table_aligment_id['7']].text)
+                    self.model.insert_unit_position(iden, name, self.unit_name, cost_workers, cost_machines, cost_drivers,
+                                                    cost_materials, self.last_table_id)
+            elif self.collection_type == 4:
+                if len(rows[row].cells) > 3:
+                    iden = cells[0].text
+                    if to_float(iden):
+                        continue
+                    if not to_float(cells[2].text):
+                        if cells[0].text.strip() == '':
+                            txt_all = ''
+                            last_str = ''
+                            for i in range(0, 4):
+                                for j in range(0, 4):
+                                    txt = rows[row + i].cells[j].text
+                                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))', txt)
+                                    if result:
+                                        continue_n = i
+                                        break
+                                    if txt != last_str:
+                                        txt_all += txt
+                                    last_str = txt
+                                else:
+                                    continue
+                                break
+                            txt_all = re.sub(r'\n', '', txt_all)
+                            txt_all = re.sub(r'\t', '', txt_all)
+                            addon_string = txt_all
+                            continue
+                    name = addon_string + cells[1].text
+                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))', iden)
+                    if not result:
+                        continue
+                    iden = self.id_prefix + iden
+                    cost = to_float_or_zero(cells[self.table_aligment_id['3']].text)
+                    cost_smeta = to_float_or_zero(cells[self.table_aligment_id['4']].text)
+                    self.model.insert_material(iden, name, self.unit_name, cost, cost_smeta,
+                                                        self.last_table_id)
         return row - 2
 
 
@@ -143,8 +218,11 @@ class Parse:
                 text_all = re.sub(r'\n', '', text_all)
                 text_all = re.sub(r'\t', '', text_all)
                 self.check_table_aligment(rows[row])
-                if self.check_razdel(text_all) and not self.check_podrazdel(text_all):
+                if self.check_otdel(text_all):
                     self.last_id = self.model.insert_caption(self.collection_id, None, text)
+                    break
+                elif self.check_razdel(text_all) and not self.check_podrazdel(text_all):
+                    self.last_id = self.model.insert_caption(self.collection_id, self.last_id, text)
                     break
                 elif self.check_podrazdel(text_all):
                     self.last_id = self.model.insert_caption(self.collection_id, self.last_id, text)
@@ -158,6 +236,7 @@ class Parse:
                         self.last_table_id = self.model.insert_caption(self.collection_id, self.last_id, table_name)
                         continue_n = row - self.parse_unit_position(table, row + 1)
                         cells = rows[row].cells
+
                         break
                     else:
                         table_name = ''
@@ -172,6 +251,8 @@ class Parse:
                                                     re.IGNORECASE)
                             self.last_table_id = self.model.insert_caption(self.collection_id, self.last_id, table_name)
                             continue_n = row - self.parse_unit_position(table, row + 1)
+
+
                             cells = rows[row].cells
                             break
                         else:

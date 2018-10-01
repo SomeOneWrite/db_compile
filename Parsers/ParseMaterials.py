@@ -1,174 +1,164 @@
+from docx import Document
 import re
-
-from Helpers import to_float
+from Helpers import to_float, to_float_or_zero, without_lines, without_whitespace
 
 
 class ParseMaterials:
-    def __init__(self, query):
-        self.query = query
+    def __init__(self, model):
+        self.model = model
+        self.last_id = None
+        self.collection_id = None
+        self.table_aligment_id = {
+        }
 
-    def get_material_price(self, cells):
-        result = None
-        result_2 = None
-        for i in range(1, 6):
-            if len(cells) - 1 < i:
-                break
-            result = cells[i].text
-            result = ''.join(result.split())
-            result = result.replace(',', '.')
-            try:
-                result = float(result)
-                result_2 = cells[i + 1].text
-                result_2 = ''.join(result_2.split())
-                result_2 = result_2.replace(',', '.')
-                result_2 = float(result_2)
-                return result, result_2
-            except Exception as e:
-                result = None
-                continue
-            break
-        return result, result_2
+    def run(self, doc: Document, collection_id: int, id_prefix: str, collection_type: int):
+        self.collection_id = collection_id
+        self.id_prefix = id_prefix
+        self.collection_type = collection_type
+        count = 0
+        for table in range(0, len(doc.tables)):
+            self.parse_caption(doc.tables[table])
+            count += 1
 
-    def check_material_key(self, cells):
-        cell = cells[0]
-        result = re.search(r'(\d\d\d-\d\d\d\d)\D', cell.text)
+    def get_unit(self, row_str):
+        result = re.search(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', row_str, re.IGNORECASE)
         if result:
             return result.group(1)
         return None
 
-    def check_material_key_text(self, text):
-        result = re.search(r'\A(\d\d\d-\d\d\d\d)\s\D', text)
+    def check_otdel(self, row_str: str):
+        row_str = re.sub(r'\n', '', row_str)
+        row_str = re.sub(r'\t', '', row_str)
+        result = re.search(r'(Отдел\s?\d{1,2}(.*?))$', row_str, re.IGNORECASE)
         if result:
             return result.group(1)
         return None
 
-    def run(self, row):
-        result = self.check_material_key(row.cells)
-        if not result: return
-        db_result = self.query.execute("select * from materials where materials.id = ?", [result]).fetchone()
-        if db_result:
-            price, price_2 = self.get_material_price(row.cells)
-            if re.match("^\d+?\.\d+?$", str(price)) is None:
-                pass
-            if not price:
-                print('error update materials with id {}'.format(db_result[0]))
+    def check_razdel(self, row_str: str):
+        result = re.search(r'(раздел\s?\d?)', row_str, re.IGNORECASE)
+        if result:
+            return result.group(1)
+        return None
+
+    def check_podrazdel(self, row_str: str):
+        result = re.search(r'(Подраздел\s?\d?)', row_str, re.IGNORECASE)
+        if result:
+            return result.group(1)
+        return None
+
+    def check_razdel(self, row_str: str):
+        result = re.search(r'(раздел\s?\d?)', row_str, re.IGNORECASE)
+        if result:
+            return result.group(1)
+        return None
+
+    def check_table_name(self, row_str: str):
+        result = re.search(r'(Таблица\s?\d?)', row_str, re.IGNORECASE)
+        if result:
+            return result.group(1)
+        return None
+
+    def check_chapter(self, row_str: str):
+        result = re.search(r'(Часть\s\d{1,3}\W)', row_str, re.IGNORECASE)
+        if result:
+            return result.group(1)
+        return None
+
+    def check_kniga(self, row_str: str):
+        row_str = re.sub(r'\n', '', row_str)
+        row_str = re.sub(r'\t', '', row_str)
+        result = re.search(r'(Книга(.*?)$)', row_str, re.IGNORECASE)
+        if result:
+            return result.group(1)
+        return None
+
+    def check_gruppa(self, row_str: str):
+        result = re.search(r'(Группа(.*?)$)', row_str, re.IGNORECASE)
+        if result:
+            return result.group(1)
+        return None
+
+    def check_table_aligment(self, row):
+        for cell in row.cells:
+            result = re.sub(r'\d*', '', cell.text).strip()
+            if result != '':
                 return
-            result = self.query.execute('update materials set price_vacantion = ? where materials.id = ?',
-                                        (price, db_result[0]))
-            if not result:
-                print('error update materials with id {} , not result'.format(db_result[0]))
-            return
-        return
+        for cell in range(0, len(row.cells)):
+            result = row.cells[cell].text.strip()
+            self.table_aligment_id[result] = cell
 
-    def run_text(self, doc, count):
-        i = 0  # (\d{0,3}\s{0,1}\d{0,3},\d{1,2})\D{1,2}(\d{0,3}\s{0,1}\d{0,3},\d{1,2})
-        pattern = r'(\d{0,3}\s{0,1}\d{0,3},\d{1,2})\D{1,2}(\d{0,3}\s{0,1}\d{0,3},\d{1,2})'
-        p_iter = iter(doc.paragraphs)
-        ln = len(doc.paragraphs)
-        for p in p_iter:
-            i += 1
-            key = self.check_material_key_text(p.text)
-            if key:
-                count += 1
-                db_result = self.query.execute("select * from materials where materials.id = ?", [key]).fetchone()
-                if not db_result:
-                    print('these id doesnt exists {} '.format(key))
+    def parse_unit_position(self, table, row_i):
+        addon_string = ''
+        rows = table.rows
+        continue_n = 0
+        for row in range(row_i, len(rows)):
+            if continue_n > 0:
+                continue_n -= 1
+                continue
+            cells = rows[row].cells
+            for cell in range(0, len(cells)):
+                cell_text = rows[row].cells[cell].text
+                if self.check_kniga(cell_text):
+                    return row
+                if self.check_chapter(cell_text):
+                    return row
+                if self.check_razdel(cell_text):
+                    return row
+                if self.check_gruppa(cell_text):
+                    return row
+            if cells[1].text == cells[2].text:
+                addon_string = without_lines(cells[1].text)
+                continue
+            if len(rows[row].cells) == 5:
+                if cells[1].text == cells[2].text:
+                    addon_string = without_lines(cells[1].text)
+                    continue
+                id = without_lines(without_whitespace(cells[0].text))
+                if addon_string:
+                    name = addon_string + ' ' + without_lines(cells[1].text)
                 else:
-                    if db_result[3] != None:
-                        continue
-                    price = re.search(pattern, p.text)
-                    if price:
-                        res = self.query.execute(
-                            'update materials set price = ?, price_vacantion = ? where materials.id = ?',
-                            [to_float(price.group(2)), to_float(price.group(1)), db_result[0]])
+                    name = addon_string + '' + without_lines(cells[1].text)
+                unit = without_lines(cells[2].text)
+                cost = to_float(cells[3].text)
+                cost_smeta = to_float(cells[4].text)
+                self.model.insert_material(id, name, unit, cost, cost_smeta, self.last_table_id)
+                continue
+            if len(rows[row].cells) > 6:
+                print('sghafolksfjlhlgaf;gdsjhfj               {}'.format(len(rows[row].cells)))
+        return row
 
-                    else:
-                        try:
-                            p_next = next(p_iter)
-                        except:
-                            continue
-                        key_2 = self.check_material_key_text(p_next.text)
-                        if not key_2:
-                            price = re.search(
-                                pattern,
-                                p_next.text)
-                            if price:
-                                self.query.execute(
-                                    'update materials set price = ?, price_vacantion = ? where materials.id = ?',
-                                    [to_float(price.group(2)), to_float(price.group(1)), db_result[0]])
-                            else:
-                                try:
-                                    p_next = next(p_iter)
-                                except:
-                                    continue
-                                key_2 = self.check_material_key_text(p_next.text)
-                                if not key_2:
-                                    price = re.search(
-                                        pattern,
-                                        p_next.text)
-                                    if price:
-                                        self.query.execute(
-                                            'update materials set price = ?, price_vacantion = ? where materials.id = ?',
-                                            [to_float(price.group(2)), to_float(price.group(1)), db_result[0]])
-                                    else:
-                                        try:
-                                            p_next = next(p_iter)
-                                        except:
-                                            continue
-                                        key_2 = self.check_material_key_text(p_next.text)
-                                        if not key_2:
-                                            price = re.search(
-                                                pattern,
-                                                p_next.text)
-                                            if price:
-                                                self.query.execute(
-                                                    'update materials set price = ?, price_vacantion = ? where materials.id = ?',
-                                                    [to_float(price.group(2)), to_float(price.group(1)), db_result[0]])
-                                            else:
-                                                try:
-                                                    p_next = next(p_iter)
-                                                except:
-                                                    continue
-                                                key_2 = self.check_material_key_text(p_next.text)
-                                                if not key_2:
-                                                    price = re.search(
-                                                        pattern,
-                                                        p_next.text)
-                                                    if price:
-                                                        self.query.execute(
-                                                            'update materials set price = ?, price_vacantion = ? where materials.id = ?',
-                                                            [to_float(price.group(2)), to_float(price.group(1)),
-                                                             db_result[0]])
-                                                    else:
-                                                        try:
-                                                            p_next = next(p_iter)
-                                                        except:
-                                                            continue
-                                                        key_2 = self.check_material_key_text(p_next.text)
-                                                        if not key_2:
-                                                            price = re.search(
-                                                                pattern,
-                                                                p_next.text)
-                                                            if price:
-                                                                self.query.execute(
-                                                                    'update materials set price = ?, price_vacantion = ? where materials.id = ?',
-                                                                    [to_float(price.group(2)), to_float(price.group(1)),
-                                                                     db_result[0]])
-                                                            else:
-                                                                try:
-                                                                    p_next = next(p_iter)
-                                                                except:
-                                                                    continue
-                                                                key_2 = self.check_material_key_text(p_next.text)
-                                                                if not key_2:
-                                                                    price = re.search(
-                                                                        pattern,
-                                                                        p_next.text)
-                                                                    if price:
-                                                                        self.query.execute(
-                                                                            'update materials set price = ?, price_vacantion = ? where materials.id = ?',
-                                                                            [to_float(price.group(2)),
-                                                                             to_float(price.group(1)),
-                                                                             db_result[0]])
-                                                                    else:
-                                                                        print('error updating with id {}'.format(key))
+    def parse_caption(self, table):
+        rows = table.rows
+        continue_n = 0
+        for row in range(0, len(rows)):
+            if continue_n > 0:
+                continue_n -= 1
+                continue
+            try:
+                cells = rows[row].cells
+            except Exception as e:
+                continue
+            for cell in range(0, len(cells)):
+                cells = rows[row].cells
+                text = cells[cell].text
+                text_all = ' '
+                for i in cells:
+                    text_all += i.text
+                text_all = re.sub(r'\n', '', text_all)
+                text_all = re.sub(r'\t', '', text_all)
+                self.check_table_aligment(rows[row])
+                if self.check_kniga(text_all):
+                    self.last_id = self.model.insert_caption(self.collection_id, None, text)
+                    break
+                elif self.check_chapter(text_all):
+                    self.last_id = self.model.insert_caption(self.collection_id, self.last_id, text)
+                    break
+                elif self.check_razdel(text_all):
+                    self.last_id = self.model.insert_caption(self.collection_id, self.last_id, text)
+                    break
+                elif self.check_gruppa(text_all):
+                    self.last_table_id = self.model.insert_caption(self.collection_id, self.last_id, text)
+                    con = self.parse_unit_position(table, row + 1)
+                    continue_n = con - row - 1
+                    cells = rows[row].cells
+                    break
