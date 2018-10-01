@@ -106,7 +106,7 @@ class ParseMaterials:
                     return row
                 if self.check_gruppa(cell_text):
                     return row
-            if cells[1].text == cells[2].text:
+            if cells[1].text == cells[2].text or cells[1].text == cells[0].text:
                 addon_string = without_lines(cells[1].text)
                 continue
             if len(rows[row].cells) == 5:
