@@ -26,11 +26,12 @@ class FileModel:
         self.last_collection_id = 1
         self.last_dir_id = 1
         self.last_unit_position_id = 1
+        self.count = 0
 
     def init_db(self):
         if os.path.exists(self.db_name):
             os.remove(self.db_name)
-        print("Database and tables created")
+
 
     def insert_caption(self, collection_id: int, parent_id: int, name: str):
         # print('insert caption: coll_id = {}     parent_id = {}     name = {}'.format(collection_id, parent_id, name))
@@ -52,6 +53,7 @@ class FileModel:
                              cost_materials: str, caption_id: int):
         self.tables[self.last_unit_position_id] = [id, name, unit, cost_workers, cost_machines, cost_drivers, cost_materials, caption_id]
         self.last_unit_position_id += 1
+        print("id {} : {}".format(id, name))
         return self.last_unit_position_id
 
     def commit(self):

@@ -15,13 +15,13 @@ class Parse:
 
         }
 
-    def run(self, doc: Document, collection_id: int):
+    def run(self, doc: Document, collection_id: int, id_prefix: str):
         self.collection_id = collection_id
+        self.id_prefix = id_prefix
         count = 0
         for table in range(0, len(doc.tables)):
             self.parse_caption(doc.tables[table])
             count += 1
-        pass
 
     def get_unit(self, row_str):
         result = re.search(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', row_str, re.IGNORECASE)
@@ -62,14 +62,14 @@ class Parse:
             result = row.cells[cell].text.strip()
             self.table_aligment_id[result] = cell
 
-
-
-
     def parse_unit_position(self, table, row_i):
         addon_string = ''
         rows = table.rows
-        row = row_i
-        while row < len(rows):
+        continue_n = 0
+        for row in range(row_i, len(rows)):
+            if continue_n > 0:
+                continue_n -= 1
+                continue
             cells = rows[row].cells
             for cell in range(0, len(cells)):
                 cell_text = rows[row].cells[cell].text
@@ -82,12 +82,10 @@ class Parse:
 
             if cells[0].text == cells[1].text == cells[2].text == cells[3].text:
                 addon_string = cells[0].text
-                row += 1
                 continue
             if len(rows[row].cells) > 7:
                 iden = cells[0].text
                 if to_float(iden):
-                    row += 1
                     continue
                 if not to_float(cells[2].text):
                     if cells[0].text.strip() == '':
@@ -98,7 +96,7 @@ class Parse:
                                 txt = rows[row + i].cells[j].text
                                 result = re.search(r'\d\d-\d\d-\d\d\d-\d\d', txt)
                                 if result:
-                                    row += i
+                                    continue_n = i
                                     break
                                 if txt != last_str:
                                     txt_all += txt
@@ -113,8 +111,8 @@ class Parse:
                 name = addon_string + cells[1].text
                 result = re.search(r'\d\d-\d\d-\d\d\d-\d\d', iden)
                 if not result:
-                    row += 1
                     continue
+                iden = self.id_prefix + iden
                 cost_workers = to_float_or_zero(cells[self.table_aligment_id['4']].text)
 
                 cost_machines = to_float_or_zero(cells[self.table_aligment_id['5']].text)
@@ -122,15 +120,20 @@ class Parse:
                 cost_materials = to_float_or_zero(cells[self.table_aligment_id['7']].text)
                 self.model.insert_unit_position(iden, name, self.unit_name, cost_workers, cost_machines, cost_drivers,
                                                 cost_materials, self.last_table_id)
-            row += 1
         return row - 2
 
 
     def parse_caption(self, table):
         rows = table.rows
-        row = 0
-        while row < len(rows):
-            cells = rows[row].cells
+        continue_n = 0
+        for row in range(0, len(rows)):
+            if continue_n > 0:
+                continue_n -= 1
+                continue
+            try:
+                cells = rows[row].cells
+            except Exception as e:
+                continue
             for cell in range(0, len(cells)):
                 cells = rows[row].cells
                 text = cells[cell].text
@@ -142,11 +145,9 @@ class Parse:
                 self.check_table_aligment(rows[row])
                 if self.check_razdel(text_all) and not self.check_podrazdel(text_all):
                     self.last_id = self.model.insert_caption(self.collection_id, None, text)
-                    row += 1
                     break
                 elif self.check_podrazdel(text_all):
                     self.last_id = self.model.insert_caption(self.collection_id, self.last_id, text)
-                    row += 1
                     break
                 elif self.check_table_name(text_all):
                     table_name = re.sub(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', '', text, re.IGNORECASE)
@@ -155,7 +156,7 @@ class Parse:
                     self.unit_name = self.get_unit(text_all)
                     if self.unit_name:
                         self.last_table_id = self.model.insert_caption(self.collection_id, self.last_id, table_name)
-                        row = self.parse_unit_position(table, row + 1)
+                        continue_n = row - self.parse_unit_position(table, row + 1)
                         cells = rows[row].cells
                         break
                     else:
@@ -170,14 +171,13 @@ class Parse:
                             table_name = re.sub(r'(\s*Измеритель:\s*\d{0,10}\s?\b(\w*)\b\s*)', '', table_name,
                                                     re.IGNORECASE)
                             self.last_table_id = self.model.insert_caption(self.collection_id, self.last_id, table_name)
-                            row = self.parse_unit_position(table, row + 1)
+                            continue_n = row - self.parse_unit_position(table, row + 1)
                             cells = rows[row].cells
                             break
                         else:
                             self.model.commit()
                             print('text_all = {}'.format(text_all))
-                            exit(0)
+                            return
                             pdb.set_trace()
                 else:
-                    row += 1
                     break
