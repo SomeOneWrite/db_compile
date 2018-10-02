@@ -15,6 +15,9 @@ class Parse:
         self.collection_id = None
         self.table_aligment_id = {
         }
+        self.last_podrazdel_id = None
+        self.last_razdel_id = None
+        self.last_otdel_id = None
 
     def run(self, doc: Document, collection_id: int, id_prefix: str, collection_type : int):
         self.collection_id = collection_id
@@ -219,24 +222,27 @@ class Parse:
                 text_all = re.sub(r'\t', '', text_all)
                 self.check_table_aligment(rows[row])
                 if self.check_otdel(text_all):
-                    self.last_id = self.model.insert_caption(self.collection_id, None, text)
+                    self.last_otdel_id= self.model.insert_caption(self.collection_id, None, text)
+                    self.last_razdel_id = None
                     break
                 elif self.check_razdel(text_all) and not self.check_podrazdel(text_all):
-                    self.last_id = self.model.insert_caption(self.collection_id, self.last_id, text)
+                    self.last_razdel_id = self.model.insert_caption(self.collection_id, self.last_otdel_id, text)
+                    self.last_podrazdel_id = None
                     break
                 elif self.check_podrazdel(text_all):
-                    self.last_id = self.model.insert_caption(self.collection_id, self.last_id, text)
+                    self.last_podrazdel_id = self.model.insert_caption(self.collection_id, self.last_razdel_id, text)
                     break
                 elif self.check_table_name(text_all):
+                    if not self.last_podrazdel_id:
+                        self.last_podrazdel_id = self.last_razdel_id
                     table_name = re.sub(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', '', text, re.IGNORECASE)
                     table_name = re.sub(r'\t', '', table_name)
                     table_name = re.sub(r'\n', '', table_name)
                     self.unit_name = self.get_unit(text_all)
                     if self.unit_name:
-                        self.last_table_id = self.model.insert_caption(self.collection_id, self.last_id, table_name)
+                        self.last_table_id = self.model.insert_caption(self.collection_id, self.last_podrazdel_id, table_name)
                         continue_n = row - self.parse_unit_position(table, row + 1)
                         cells = rows[row].cells
-
                         break
                     else:
                         table_name = ''
@@ -249,7 +255,7 @@ class Parse:
                         if self.unit_name:
                             table_name = re.sub(r'(\s*Измеритель:\s*\d{0,10}\s?\b(\w*)\b\s*)', '', table_name,
                                                     re.IGNORECASE)
-                            self.last_table_id = self.model.insert_caption(self.collection_id, self.last_id, table_name)
+                            self.last_table_id = self.model.insert_caption(self.collection_id, self.last_podrazdel_id, table_name)
                             continue_n = row - self.parse_unit_position(table, row + 1)
 
 

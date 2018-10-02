@@ -39,14 +39,19 @@ class ParseMachines:
                 text_all = re.sub(r'\n', '', text_all)
                 text_all = re.sub(r'\t', '', text_all)
                 if self.check_kniga(text_all):
-                    self.last_id = self.model.insert_caption(self.collection_id, None, text)
+                    self.last_kniga_id = self.model.insert_caption(self.collection_id, None, text)
                     break
                 elif self.check_razdel(text_all):
-                    self.last_id = self.model.insert_caption(self.collection_id, self.last_id, text)
+                    self.last_razdel_id = self.model.insert_caption(self.collection_id, self.last_kniga_id, text)
                     break
                 elif self.check_gruppa(text_all):
-                    self.last_table_id = self.model.insert_caption(self.collection_id, self.last_id, cells[cell].text)
+                    if cells[cell].text:
+                        self.last_table_id = self.model.insert_caption(self.collection_id, self.last_razdel_id, cells[cell].text)
+                    else:
+                        self.last_table_id = self.model.insert_caption(self.collection_id, self.last_razdel_id,
+                                                                       cells[cell + 1].text)
                     continue_n = row - self.parse_costs(table, row + 1)
+
                     cells = rows[row].cells
                     break
                 else:

@@ -5,10 +5,10 @@ from docx import Document
 from FolderWalker import FolderWalker
 from Model import FileModel, SqlModel
 from Parsers.ParseCollection import Parse
-
-folder_walker = FolderWalker(r'крым')
-thread_data = (folder_walker.walk(r'крым'))
 model = SqlModel('result.sqlite')
+folder_walker = FolderWalker(r'крым', model)
+thread_data = (folder_walker.walk(r'крым'))
+
 def process(args):
     print("Start process with filename: {}\n".format(args[0]))
     collection_id = model.insert_collection(args[2], args[3], args[1], '')
