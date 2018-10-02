@@ -91,6 +91,7 @@ class ParseMaterials:
         addon_string = ''
         rows = table.rows
         continue_n = 0
+        row = 0
         for row in range(row_i, len(rows)):
             if continue_n > 0:
                 continue_n -= 1
@@ -114,10 +115,14 @@ class ParseMaterials:
                     addon_string = without_lines(cells[1].text)
                     continue
                 id = without_lines(without_whitespace(cells[0].text))
+                result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))', id)
+                if not result:
+                    continue
                 if addon_string:
                     name = addon_string + ' ' + without_lines(cells[1].text)
                 else:
                     name = addon_string + '' + without_lines(cells[1].text)
+
                 unit = without_lines(cells[2].text)
                 cost = to_float(cells[3].text)
                 cost_smeta = to_float(cells[4].text)
