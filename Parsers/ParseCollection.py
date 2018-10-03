@@ -200,18 +200,17 @@ class Parse:
                                                         self.last_table_id)
         return row - 2
 
-    def get_all_text(self, rows, row_i, count: int = -1):
+    def get_all_text(self, rows, count: int = 1):
         text_all = ''
         last_text = ''
         is_all = False
-        for row in range(row_i, len(rows)):
-            cells = rows[row].cells
+        for row in rows:
+            cells = row.cells
             if is_all:
                 self.unit_name = re.search(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', text_all).group(1)
                 text_all = re.sub(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', '', text_all)
                 text_all = re.sub(r'\n', '', text_all)
                 text_all = re.sub(r'\t', '', text_all)
-                self.table_name = re.sub(r'(.*?)(Таблица(.*?))', r'\g<2>', text_all)
                 return text_all
             for i in cells:
                 if i.text == last_text:
@@ -228,11 +227,9 @@ class Parse:
 
 
     def parse_caption(self, table):
-        self.table_name = None
         self.unit_name = None
         rows = table.rows
         continue_n = 0
-        text_all = ''
         for row in range(0, len(rows)):
             if continue_n > 0:
                 continue_n -= 1
@@ -241,7 +238,7 @@ class Parse:
                 cells = rows[row].cells
             except Exception as e:
                 continue
-            text_all = self.get_all_text(rows, row, count=1)
+            text_all = self.get_all_text(rows, count=1)
             for cell in range(0, len(cells)):
                 cells = rows[row].cells
                 text = cells[cell].text
@@ -250,24 +247,25 @@ class Parse:
                     self.last_otdel_id= self.model.insert_caption(self.collection_id, None, text)
                     self.last_razdel_id = None
                     break
-                elif self.check_podrazdel(text):
-                    self.last_podrazdel_id = self.model.insert_caption(self.collection_id, self.last_razdel_id, text)
-                    text_all = self.get_all_text(rows, row)
-                    break
                 elif self.check_razdel(text) and not self.check_podrazdel(text_all):
                     self.last_razdel_id = self.model.insert_caption(self.collection_id, self.last_otdel_id, text)
                     self.last_podrazdel_id = None
                     break
-                elif self.table_name:#self.check_table_name(text_all):
+                elif self.check_podrazdel(text):
+                    self.last_podrazdel_id = self.model.insert_caption(self.collection_id, self.last_razdel_id, text)
+                    text_all = self.get_all_text(rows)
+                    break
+                elif self.check_table_name(text_all):
                     if not self.last_podrazdel_id:
                         self.last_podrazdel_id = self.last_razdel_id
+                    table_name = re.sub(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', '', text_all, re.IGNORECASE)
+                    table_name = re.sub(r'\t', '', table_name)
+                    table_name = re.sub(r'\n', '', table_name)
                     #self.unit_name = self.get_unit(text_all)
                     if self.unit_name:
-
-                        self.last_table_id = self.model.insert_caption(self.collection_id, self.last_podrazdel_id, self.table_name)
+                        self.last_table_id = self.model.insert_caption(self.collection_id, self.last_podrazdel_id, table_name)
                         continue_n = row - self.parse_unit_position(table, row + 1)
                         cells = rows[row].cells
-                        self.table_name = None
                         break
                     else:
                         table_name = ''
