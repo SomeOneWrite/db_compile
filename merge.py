@@ -1,24 +1,50 @@
-import sqlite3
-from Helpers import without_lines
+# import sqlite3
+# from Helpers import without_lines
+from docx import Document
+from docx.oxml.ns import qn
+# conn = sqlite3.connect('unit_positions.sqlite')
+# query = conn.cursor()
+# new_list = []
+#
+# all_captions = list(query.execute("select * from captions").fetchall())
+# for caption in all_captions:
+#     tmp_l = []
+#     for i in caption:
+#         if type(i) is str:
+#             tmp_l.append(without_lines(i))
+#         else:
+#             tmp_l.append(i)
+#     new_list.append(tmp_l)
+#
+# for l in new_list:
+#     query.execute('update captions set name = ? where id = ?', (l[3], l[0]))
+#
+# conn.commit()
+#
+#
+# file_name = '1.docx'
+#
+# doc = Document(file_name)
+#
+# tables = doc.tables
+#
+# for table in tables:
+#     rows = table.rows
+#     for row in rows:
+#         cells = row.cells
+#         for cell in cells:
+#             tc = cell._tc
+#             tcPr = tc.get_or_add_tcPr()
+#             tcBorders = tcPr.first_child_found_in("w:tcBorders")
+#             if tcBorders is None:
+#                 continue
+#             tcBorder.values()
+#             for edge in ('start', 'top', 'end', 'bottom', 'insideH', 'insideV'):
+#                 tag = 'w:{}'.format(edge)
+#                 element = tcBorders.find(qn(tag))
+#                 if element:
+#                     pass
 
-conn = sqlite3.connect('unit_positions.sqlite')
-query = conn.cursor()
-new_list = []
-
-all_captions = list(query.execute("select * from captions").fetchall())
-for caption in all_captions:
-    tmp_l = []
-    for i in caption:
-        if type(i) is str:
-            tmp_l.append(without_lines(i))
-        else:
-            tmp_l.append(i)
-    new_list.append(tmp_l)
-
-for l in new_list:
-    query.execute('update captions set name = ? where id = ?', (l[3], l[0]))
-
-conn.commit()
 # conn = sqlite3.connect('result.sqlite')
 #
 # query_unit = conn_unit_pos.cursor()

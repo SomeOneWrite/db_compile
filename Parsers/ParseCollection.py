@@ -200,10 +200,39 @@ class Parse:
                                                         self.last_table_id)
         return row - 2
 
+    def get_all_text(self, rows, row_i, count: int = -1):
+        text_all = ''
+        last_text = ''
+        is_all = False
+        for row in range(row_i, len(rows)):
+            cells = rows[row].cells
+            if is_all:
+                self.unit_name = re.search(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', text_all).group(1)
+                text_all = re.sub(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', '', text_all)
+                text_all = re.sub(r'\n', '', text_all)
+                text_all = re.sub(r'\t', '', text_all)
+                self.table_name = re.sub(r'(.*?)(Таблица(.*?))', r'\g<2>', text_all)
+                return text_all
+            for i in cells:
+                if i.text == last_text:
+                    continue
+                if re.search(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', i.text):
+                    is_all = True
+                last_text = i.text
+                text_all += i.text
+            text_all = re.sub(r'\n', '', text_all)
+            text_all = re.sub(r'\t', '', text_all)
+            if count == 1:
+                return text_all
+        return text_all
+
 
     def parse_caption(self, table):
+        self.table_name = None
+        self.unit_name = None
         rows = table.rows
         continue_n = 0
+        text_all = ''
         for row in range(0, len(rows)):
             if continue_n > 0:
                 continue_n -= 1
@@ -212,37 +241,33 @@ class Parse:
                 cells = rows[row].cells
             except Exception as e:
                 continue
+            text_all = self.get_all_text(rows, row, count=1)
             for cell in range(0, len(cells)):
                 cells = rows[row].cells
                 text = cells[cell].text
-                text_all = ' '
-                for i in cells:
-                    text_all += i.text
-                text_all = re.sub(r'\n', '', text_all)
-                text_all = re.sub(r'\t', '', text_all)
                 self.check_table_aligment(rows[row])
-                if self.check_otdel(text_all):
+                if self.check_otdel(text):
                     self.last_otdel_id= self.model.insert_caption(self.collection_id, None, text)
                     self.last_razdel_id = None
                     break
-                elif self.check_razdel(text_all) and not self.check_podrazdel(text_all):
+                elif self.check_podrazdel(text):
+                    self.last_podrazdel_id = self.model.insert_caption(self.collection_id, self.last_razdel_id, text)
+                    text_all = self.get_all_text(rows, row)
+                    break
+                elif self.check_razdel(text) and not self.check_podrazdel(text_all):
                     self.last_razdel_id = self.model.insert_caption(self.collection_id, self.last_otdel_id, text)
                     self.last_podrazdel_id = None
                     break
-                elif self.check_podrazdel(text_all):
-                    self.last_podrazdel_id = self.model.insert_caption(self.collection_id, self.last_razdel_id, text)
-                    break
-                elif self.check_table_name(text_all):
+                elif self.table_name:#self.check_table_name(text_all):
                     if not self.last_podrazdel_id:
                         self.last_podrazdel_id = self.last_razdel_id
-                    table_name = re.sub(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', '', text, re.IGNORECASE)
-                    table_name = re.sub(r'\t', '', table_name)
-                    table_name = re.sub(r'\n', '', table_name)
-                    self.unit_name = self.get_unit(text_all)
+                    #self.unit_name = self.get_unit(text_all)
                     if self.unit_name:
-                        self.last_table_id = self.model.insert_caption(self.collection_id, self.last_podrazdel_id, table_name)
+
+                        self.last_table_id = self.model.insert_caption(self.collection_id, self.last_podrazdel_id, self.table_name)
                         continue_n = row - self.parse_unit_position(table, row + 1)
                         cells = rows[row].cells
+                        self.table_name = None
                         break
                     else:
                         table_name = ''
@@ -251,7 +276,7 @@ class Parse:
                                 table_name += rows[row + i].cells[j].text
                         table_name = re.sub(r'\n', '', table_name)
                         table_name = re.sub(r'\t', '', table_name)
-                        self.unit_name = self.get_unit(table_name)
+                        #self.unit_name = self.get_unit(table_name)
                         if self.unit_name:
                             table_name = re.sub(r'(\s*Измеритель:\s*\d{0,10}\s?\b(\w*)\b\s*)', '', table_name,
                                                     re.IGNORECASE)
