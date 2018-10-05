@@ -20,62 +20,33 @@ class ParseMaterials:
             self.parse_caption(doc.tables[table])
             count += 1
 
-    def get_unit(self, row_str):
-        result = re.search(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', row_str, re.IGNORECASE)
-        if result:
-            return result.group(1)
-        return None
-
-    def check_otdel(self, row_str: str):
-        row_str = re.sub(r'\n', '', row_str)
-        row_str = re.sub(r'\t', '', row_str)
-        result = re.search(r'(Отдел\s?\d{1,2}(.*?))$', row_str, re.IGNORECASE)
-        if result:
-            return result.group(1)
-        return None
-
     def check_razdel(self, row_str: str):
-        result = re.search(r'(раздел\s?\d?)', row_str, re.IGNORECASE)
+        result = re.search(r'(\W|^)(раздел\s(.*?))(группа)', row_str, re.IGNORECASE)
         if result:
-            return result.group(1)
-        return None
-
-    def check_podrazdel(self, row_str: str):
-        result = re.search(r'(Подраздел\s?\d?)', row_str, re.IGNORECASE)
-        if result:
-            return result.group(1)
-        return None
-
-    def check_razdel(self, row_str: str):
-        result = re.search(r'(раздел\s?\d?)', row_str, re.IGNORECASE)
-        if result:
-            return result.group(1)
+            return result.group(2)
         return None
 
     def check_table_name(self, row_str: str):
-        result = re.search(r'(Таблица\s?\d?)', row_str, re.IGNORECASE)
+        result = re.search(r'(\W|^)(Таблица\s(.*?))($)', row_str, re.IGNORECASE | re.DOTALL)
         if result:
-            return result.group(1)
+            return result.group(2)
         return None
 
     def check_chapter(self, row_str: str):
-        result = re.search(r'(Часть\s\d{1,3}\W)', row_str, re.IGNORECASE)
+        result = re.search(r'(\W|^)(часть\s(.*?))(раздел|группа)', row_str, re.IGNORECASE)
         if result:
-            return result.group(1)
+            return result.group(2)
         return None
 
     def check_kniga(self, row_str: str):
-        row_str = re.sub(r'\n', '', row_str)
-        row_str = re.sub(r'\t', '', row_str)
-        result = re.search(r'(Книга(.*?)$)', row_str, re.IGNORECASE)
+        result = re.search(r'(\W|^)(книга\s(.*?))(часть|раздел)', row_str, re.IGNORECASE)
         if result:
-            return result.group(1)
-        return None
+            return result.group(2)
 
     def check_gruppa(self, row_str: str):
-        result = re.search(r'(Группа(.*?)$)', row_str, re.IGNORECASE)
+        result = re.search(r'(\W|^)(группа\s(.*?))(таблица)', row_str, re.IGNORECASE)
         if result:
-            return result.group(1)
+            return result.group(2)
         return None
 
     def check_table_aligment(self, row):
@@ -132,7 +103,68 @@ class ParseMaterials:
                 print('sghafolksfjlhlgaf;gdsjhfj               {}'.format(len(rows[row].cells)))
         return row
 
+    def get_all_text(self, rows, row_i, count: int = 1):
+        text_all = ''
+        last_text = ''
+        is_all = False
+        for row in range(row_i, len(rows)):
+            self.check_table_aligment(rows[row])
+            cells = rows[row].cells
+            if is_all:
+                self.unit_name = re.search(r'Измеритель:\s*(\d{0,10}\s?\b(\w*)\b)', text_all).group(1)
+                text_all = re.sub(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', '', text_all)
+                text_all = re.sub(r'\n', '', text_all)
+                text_all = re.sub(r'\t', '', text_all)
+                return text_all, row
+            for i in cells:
+                if i.text == last_text:
+                    continue
+                if re.search(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', i.text):
+                    is_all = True
+                last_text = i.text
+                text_all += i.text
+            text_all = re.sub(r'\n', '', text_all)
+            text_all = re.sub(r'\t', '', text_all)
+            if count == 1:
+                text_all = re.sub(r'\n', '', text_all)
+                text_all = re.sub(r'\t', '', text_all)
+                return text_all, row
+        text_all = re.sub(r'\n', '', text_all)
+        text_all = re.sub(r'\t', '', text_all)
+        return text_all, row
+
+    def all_checks(self, all_text):
+        name = self.check_kniga(all_text)
+        if name:
+            self.last_kniga_id = self.model.insert_caption(self.collection_id, None, name)
+
+        name = self.check_chapter(all_text)
+        if name:
+            self.last_chapter_id = self.model.insert_caption(self.collection_id, self.last_kniga_id, name)
+
+        name = self.check_razdel(all_text)
+        if name:
+            self.last_razdel_id = self.model.insert_caption(self.collection_id, self.last_chapter_id, name)
+            self.last_gruppa_id = None
+
+        name = self.check_gruppa(all_text)
+        if name:
+            self.last_gruppa_id = self.model.insert_caption(self.collection_id, self.last_razdel_id, name)
+
+    def check_captions(self, rows, row_i, table):
+        for row in range(row_i, len(rows)):
+            text_all, c_row = self.get_all_text(rows, row_i, count=5)
+            self.all_checks(text_all)
+            self.check_table_aligment(rows[row])
+            name = self.check_table_name(text_all)
+            if name:
+                self.last_table_id = self.model.insert_caption(self.collection_id, self.last_gruppa_id, name)
+                next_row = self.parse_unit_position(table, c_row)
+                return next_row
+        return len(rows)
+
     def parse_caption(self, table):
+        self.unit_name = None
         rows = table.rows
         continue_n = 0
         for row in range(0, len(rows)):
@@ -143,27 +175,4 @@ class ParseMaterials:
                 cells = rows[row].cells
             except Exception as e:
                 continue
-            for cell in range(0, len(cells)):
-                cells = rows[row].cells
-                text = cells[cell].text
-                text_all = ' '
-                for i in cells:
-                    text_all += i.text
-                text_all = re.sub(r'\n', '', text_all)
-                text_all = re.sub(r'\t', '', text_all)
-                self.check_table_aligment(rows[row])
-                if self.check_kniga(text_all):
-                    self.last_id = self.model.insert_caption(self.collection_id, None, text)
-                    break
-                elif self.check_chapter(text_all):
-                    self.last_id = self.model.insert_caption(self.collection_id, self.last_id, text)
-                    break
-                elif self.check_razdel(text_all):
-                    self.last_id = self.model.insert_caption(self.collection_id, self.last_id, text)
-                    break
-                elif self.check_gruppa(text_all):
-                    self.last_table_id = self.model.insert_caption(self.collection_id, self.last_id, text)
-                    con = self.parse_unit_position(table, row + 1)
-                    continue_n = con - row - 1
-                    cells = rows[row].cells
-                    break
+            continue_n = self.check_captions(rows, row, table) - row
