@@ -128,7 +128,7 @@ class Parse:
                             for i in range(0, 4):
                                 for j in range(0, 4):
                                     txt = rows[row + i].cells[j].text
-                                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))', txt)
+                                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))|(\d{1,3}-\d{1,2}-\d{1,2})', txt)
                                     if result:
                                         continue_n = i
                                         break
@@ -143,7 +143,7 @@ class Parse:
                             addon_string = txt_all
                             continue
                     name = addon_string + cells[1].text
-                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))', iden)
+                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))|(\d{1,3}-\d{1,2}-\d{1,2})', iden)
                     if not result:
                         continue
                     iden = self.id_prefix + iden
@@ -166,7 +166,7 @@ class Parse:
                             for i in range(0, 4):
                                 for j in range(0, 4):
                                     txt = rows[row + i].cells[j].text
-                                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))', txt)
+                                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))|(\d{1,3}-\d{1,2}-\d{1,2})', txt)
                                     if result:
                                         continue_n = i
                                         break
@@ -181,7 +181,7 @@ class Parse:
                             addon_string = txt_all
                             continue
                     name = addon_string + cells[1].text
-                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))', iden)
+                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))|(\d{1,3}-\d{1,2}-\d{1,2})', iden)
                     if not result:
                         continue
                     iden = self.id_prefix + iden
