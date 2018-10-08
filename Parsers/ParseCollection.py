@@ -8,6 +8,8 @@ from Parsers.ParseMaterials import ParseMaterials
 from Parsers.ParseTransports import ParseTransports
 
 
+iden_reg_pattern = r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))|(\d{1,2}-\d{1,2}-\d{1,2})'
+
 class Parse:
     def __init__(self, model):
         self.model = model
@@ -18,6 +20,7 @@ class Parse:
         self.last_podrazdel_id = None
         self.last_razdel_id = None
         self.last_otdel_id = None
+        self.last = None
 
     def run(self, doc: Document, collection_id: int, id_prefix: str, collection_type : int):
         self.collection_id = collection_id
@@ -128,7 +131,7 @@ class Parse:
                             for i in range(0, 4):
                                 for j in range(0, 4):
                                     txt = rows[row + i].cells[j].text
-                                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))', txt)
+                                    result = re.search(iden_reg_pattern, txt)
                                     if result:
                                         continue_n = i
                                         break
@@ -143,7 +146,7 @@ class Parse:
                             addon_string = txt_all
                             continue
                     name = addon_string + cells[1].text
-                    result = re.search(r'((\d\d\W\d\W\d\d\W\d\d\W\d{2,4})|(\d\d-\d\d-\d\d\d-\d\d))', iden)
+                    result = re.search(iden_reg_pattern, iden)
                     if not result:
                         continue
                     iden = self.id_prefix + iden
@@ -227,26 +230,32 @@ class Parse:
         if name:
             self.last_otdel_id = self.model.insert_caption(self.collection_id, None, name)
             self.last_razdel_id = None
+            self.last = self.last_otdel_id
             isChecked = True
         name = self.check_chapter(all_text)
         if name:
             self.last_chast_id = self.model.insert_caption(self.collection_id, None, name)
+            self.last = self.last_chast_id
             isChecked = True
         name = self.check_gruppa(all_text)
         if name:
             self.last_gruppa_id = self.model.insert_caption(self.collection_id, None, name)
+            self.last = self.last_gruppa_id
             isChecked = True
         name = self.check_razdel(all_text)
         if name:
             if self.last_otdel_id:
                 self.last_razdel_id = self.model.insert_caption(self.collection_id, self.last_otdel_id, name)
+
             else:
                 self.last_razdel_id = self.model.insert_caption(self.collection_id, None, name)
             self.last_podrazdel_id = None
+            self.last = self.last_razdel_id
             isChecked = True
         name = self.check_podrazdel(all_text)
         if name:
             self.last_podrazdel_id = self.model.insert_caption(self.collection_id, self.last_razdel_id, name)
+            self.last = self.last_razdel_id = self.last_podrazdel_id
             isChecked = True
         return isChecked
 
@@ -259,7 +268,8 @@ class Parse:
             self.check_table_aligment(rows[row])
             name = self.check_table_name(text_all)
             if name:
-                self.last_table_id = self.model.insert_caption(self.collection_id, self.last_podrazdel_id, name)
+                last = self.get_last_id_for_table()
+                self.last_table_id = self.model.insert_caption(self.collection_id, last, name)
                 next_row = self.parse_unit_position(table, c_row)
                 return next_row
         return len(rows)
@@ -277,3 +287,8 @@ class Parse:
             except Exception as e:
                 continue
             continue_n = self.check_captions(rows, row, table) - row
+
+    def get_last_id_for_table(self):
+        if not self.last:
+            print('ERROR self.last == None')
+        return self.last
