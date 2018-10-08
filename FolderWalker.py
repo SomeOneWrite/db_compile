@@ -30,6 +30,8 @@ class FolderWalker:
                     self.threads_data.append(
                         [os.path.join(folder, file_2), file_2, dir_id, self.current_collection_type,
                          self.current_prefix])
+                self.filenames = None
+                return
             if file.endswith(".docx"):
                 if not self.filenames:
                     self.threads_data.append([os.path.join(folder, file), file, dir_id, self.current_collection_type, self.current_prefix])

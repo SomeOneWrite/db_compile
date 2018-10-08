@@ -113,7 +113,7 @@ class SqlModel:
         print("Database and tables created")
 
     def insert_caption(self, collection_id: int, parent_id: int, name: str):
-        # print('insert caption: coll_id = {}     parent_id = {}     name = {}'.format(collection_id, parent_id, name))
+        #print('insert caption: coll_id = {}     parent_id = {}     name = {}'.format(collection_id, parent_id, name))
         return self.db_cursor.execute('insert into captions (collection_id, parent_id, name) values(?, ?, ?)',
                                       (collection_id, parent_id, name)).lastrowid
 

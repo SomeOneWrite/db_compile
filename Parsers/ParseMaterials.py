@@ -71,11 +71,11 @@ class ParseMaterials:
             for cell in range(0, len(cells)):
                 cell_text = rows[row].cells[cell].text
                 if self.check_kniga(cell_text):
-                    return row
+                    return row - 1
                 if self.check_chapter(cell_text):
-                    return row
+                    return row - 1
                 if self.check_razdel(cell_text):
-                    return row
+                    return row - 1
                 if self.check_gruppa(cell_text):
                     return row
             if cells[1].text == cells[2].text or cells[1].text == cells[0].text:

@@ -2,7 +2,7 @@ from docx import Document
 from Model import FileModel, SqlModel
 import re
 import pdb
-from Helpers import to_float, to_float_or_zero
+from Helpers import to_float, to_float_or_zero, without_whitespace, without_lines
 from Parsers.ParseMachines import ParseMachines
 from Parsers.ParseMaterials import ParseMaterials
 from Parsers.ParseTransports import ParseTransports
@@ -55,9 +55,10 @@ class Parse:
         return None
 
     def check_podrazdel(self, row_str: str):
-        result = re.search(r'(\W|^)(подраздел\s(.*?))(таблица)', row_str, re.IGNORECASE)
+        result = re.search(r'(\W|^)(подраздел\s(.*?))(таблица|$)', row_str, re.IGNORECASE)
         if result:
-            self.last_podrazdel_id = self.model.insert_caption(self.collection_id, self.last_razdel_id, result.group(2))
+            return result.group(2)
+        return None
 
     def check_table_name(self, row_str: str):
         result = re.search(r'(\W|^)(Таблица\s(.*?))($)', row_str, re.IGNORECASE | re.DOTALL)
@@ -104,11 +105,11 @@ class Parse:
                 continue
             cells = rows[row].cells
             for cell in range(0, len(cells)):
-                cell_text = rows[row].cells[cell].text
+                cell_text = without_lines(rows[row].cells[cell].text)
                 if self.check_podrazdel(cell_text):
-                    return row
+                    return row - 1
                 if self.check_razdel(cell_text):
-                    return row
+                    return row - 1
                 if self.check_table_name(cell_text):
                     return row - 1
 
@@ -221,16 +222,20 @@ class Parse:
         return text_all, row
 
     def all_checks(self, all_text):
+        isChecked = False
         name = self.check_otdel(all_text)
         if name:
             self.last_otdel_id = self.model.insert_caption(self.collection_id, None, name)
             self.last_razdel_id = None
+            isChecked = True
         name = self.check_chapter(all_text)
         if name:
             self.last_chast_id = self.model.insert_caption(self.collection_id, None, name)
+            isChecked = True
         name = self.check_gruppa(all_text)
         if name:
             self.last_gruppa_id = self.model.insert_caption(self.collection_id, None, name)
+            isChecked = True
         name = self.check_razdel(all_text)
         if name:
             if self.last_otdel_id:
@@ -238,12 +243,17 @@ class Parse:
             else:
                 self.last_razdel_id = self.model.insert_caption(self.collection_id, None, name)
             self.last_podrazdel_id = None
+            isChecked = True
         name = self.check_podrazdel(all_text)
         if name:
             self.last_podrazdel_id = self.model.insert_caption(self.collection_id, self.last_razdel_id, name)
+            isChecked = True
+        return isChecked
 
     def check_captions(self, rows, row_i, table):
+        continue_n = 0
         for row in range(row_i, len(rows)):
+            self.model.commit()
             text_all, c_row = self.get_all_text(rows, row_i, count=5)
             self.all_checks(text_all)
             self.check_table_aligment(rows[row])

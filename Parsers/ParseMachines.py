@@ -70,11 +70,11 @@ class ParseMachines:
             for cell in range(0, len(cells)):
                 cell_text = rows[row].cells[cell].text
                 if self.check_kniga(cell_text):
-                    return row
+                    return row - 1
                 if self.check_razdel(cell_text):
-                    return row
+                    return row - 1
                 if self.check_gruppa(cell_text):
-                    return row
+                    return row - 1
 
             if len(rows[row].cells) == 5:
                 if cells[1].text == cells[2].text:
@@ -93,7 +93,6 @@ class ParseMachines:
                 print('sghafolksfjlhlgaf;gdsjhfj               {}'.format(len(rows[row].cells)))
                 pass
         return row
-        pass
 
 
     def check_kniga(self, row_str: str):
