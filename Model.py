@@ -113,17 +113,17 @@ class SqlModel:
         print("Database and tables created")
 
     def insert_caption(self, collection_id: int, parent_id: int, name: str):
-        #print('insert caption: coll_id = {}     parent_id = {}     name = {}'.format(collection_id, parent_id, name))
+        print('insert caption: coll_id = {}     parent_id = {}     name = {}'.format(collection_id, parent_id, name))
         return self.db_cursor.execute('insert into captions (collection_id, parent_id, name) values(?, ?, ?)',
                                       (collection_id, parent_id, name)).lastrowid
 
     def insert_collection(self, dir_id: int, type: int, name: str, tech_part: str):
-        #     print('insert collection: dir_id = {} name = {}'.format(dir_id, name))
+        print('insert collection: dir_id = {} name = {}'.format(dir_id, name))
         return self.db_cursor.execute('insert into collections (dir_id, type, name, techpart) values(?, ?, ?, ?)',
                                       (dir_id, type, name, tech_part)).lastrowid
 
     def insert_dir(self, parent_id: int, name: str):
-        # print('insert parent_id: parent_id = {}      name = {}'.format(parent_id, name))
+        print('insert parent_id: parent_id = {}      name = {}'.format(parent_id, name))
         return self.db_cursor.execute('insert into dirs(parent_id, name) values(?, ?)', (parent_id, name)).lastrowid
 
     def insert_unit_position(self, id: str, name: str, unit: str, cost_workers: str, cost_machines: str,
@@ -143,8 +143,8 @@ class SqlModel:
                                     caption_id)).lastrowid
 
     def insert_material(self, id: str, name: str, unit: str, cost: float, cost_smeta: float, caption_id: int):
-        # print('insert material: id = {} name = {}  unit = {} cost = {} cost_vacantion = {}, caption_id = {}'.format(id, name, unit,
-        #                                                                          cost, cost_smeta, caption_id))
+        print('insert material: id = {} name = {}  unit = {} cost = {} cost_vacantion = {}, caption_id = {}'.format(id, name, unit,
+                                                                                  cost, cost_smeta, caption_id))
         return \
             self.db_cursor.execute("insert into materials"
                                    "(id, name, unit, price, price_vacantion, caption_id) "
@@ -152,9 +152,9 @@ class SqlModel:
                                    (id, name, unit, cost, cost_smeta, caption_id)).lastrowid
 
     def insert_transport(self, id: str, name: str, unit: str, price: float, type: str, caption_id: int):
-        # print('insert transport: id = {} name = {}  unit = {} price = {} type = {}, caption_id = {}'.format(
-        #    id, name, unit, price, type, caption_id)
-        # )
+        print('insert transport: id = {} name = {}  unit = {} price = {} type = {}, caption_id = {}'.format(
+            id, name, unit, price, type, caption_id)
+         )
         return \
             self.db_cursor.execute('insert into transports'
                                    '(id, name, unit, price, type, caption_id)'
@@ -162,7 +162,7 @@ class SqlModel:
                                    (id, name, unit, price, type, caption_id)).lastrowid
 
     def insert_machine(self, id: str, name: str, unit: str, price: float, price_driver: float, caption_id: str):
-        # print('insert machines id = {}, name = {}, unit = {}, price = {}, price_driver = {}, caption_id = {}'.format(id, name, unit, price, price_driver, caption_id))
+        print('insert machines id = {}, name = {}, unit = {}, price = {}, price_driver = {}, caption_id = {}'.format(id, name, unit, price, price_driver, caption_id))
         return \
             self.db_cursor.execute('insert into machines'
                                    '(id, name, unit, price, price_driver, caption_id)'
