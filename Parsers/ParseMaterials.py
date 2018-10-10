@@ -10,6 +10,12 @@ class ParseMaterials:
         self.collection_id = None
         self.table_aligment_id = {
         }
+        self.last = None
+        self.last_kniga_id = None
+        self.last_chapter_id = None
+        self.last_razdel_id = None
+        self.last_gruppa_id = None
+        self.last_table_id = None
 
     def run(self, doc: Document, collection_id: int, id_prefix: str, collection_type: int):
         self.collection_id = collection_id
@@ -44,7 +50,7 @@ class ParseMaterials:
             return result.group(2)
 
     def check_gruppa(self, row_str: str):
-        result = re.search(r'(\W|^)(группа\s(.*?))(таблица)', row_str, re.IGNORECASE)
+        result = re.search(r'((Группа(.*?))$)', row_str, re.IGNORECASE)
         if result:
             return result.group(2)
         return None
@@ -97,7 +103,7 @@ class ParseMaterials:
                 unit = without_lines(cells[2].text)
                 cost = to_float(cells[3].text)
                 cost_smeta = to_float(cells[4].text)
-                self.model.insert_material(id, name, unit, cost, cost_smeta, self.last_table_id)
+                self.model.insert_material(id, name, unit, cost, cost_smeta, self.last_gruppa_id)
                 continue
             if len(rows[row].cells) > 6:
                 print('sghafolksfjlhlgaf;gdsjhfj               {}'.format(len(rows[row].cells)))
@@ -111,56 +117,60 @@ class ParseMaterials:
             self.check_table_aligment(rows[row])
             cells = rows[row].cells
             if is_all:
-                self.unit_name = re.search(r'Измеритель:\s*(\d{0,10}\s?\b(\w*)\b)', text_all).group(1)
-                text_all = re.sub(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', '', text_all)
-                text_all = re.sub(r'\n', '', text_all)
-                text_all = re.sub(r'\t', '', text_all)
+
                 return text_all, row
             for i in cells:
                 if i.text == last_text:
                     continue
-                if re.search(r'(Измеритель:\s*\d{0,10}\s?\b(\w*)\b)', i.text):
+                if re.search(r'(Группа(.*?)\n|\t)', i.text):
                     is_all = True
                 last_text = i.text
                 text_all += i.text
-            text_all = re.sub(r'\n', '', text_all)
-            text_all = re.sub(r'\t', '', text_all)
             if count == 1:
-                text_all = re.sub(r'\n', '', text_all)
-                text_all = re.sub(r'\t', '', text_all)
                 return text_all, row
-        text_all = re.sub(r'\n', '', text_all)
-        text_all = re.sub(r'\t', '', text_all)
+
         return text_all, row
 
-    def all_checks(self, all_text):
+    def all_checks(self, all_text_):
+        all_text = re.sub(r'\n', '', all_text_)
+        all_text = re.sub(r'\t', '', all_text)
         name = self.check_kniga(all_text)
         if name:
             self.last_kniga_id = self.model.insert_caption(self.collection_id, None, name)
+            self.last = self.last_kniga_id
 
         name = self.check_chapter(all_text)
         if name:
             self.last_chapter_id = self.model.insert_caption(self.collection_id, self.last_kniga_id, name)
+            self.last = self.last_chapter_id
 
         name = self.check_razdel(all_text)
         if name:
             self.last_razdel_id = self.model.insert_caption(self.collection_id, self.last_chapter_id, name)
             self.last_gruppa_id = None
+            self.last = self.last_razdel_id
 
-        name = self.check_gruppa(all_text)
-        if name:
-            self.last_gruppa_id = self.model.insert_caption(self.collection_id, self.last_razdel_id, name)
+
 
     def check_captions(self, rows, row_i, table):
         for row in range(row_i, len(rows)):
+            self.model.commit()
             text_all, c_row = self.get_all_text(rows, row_i, count=5)
             self.all_checks(text_all)
             self.check_table_aligment(rows[row])
             name = self.check_table_name(text_all)
             if name:
-                self.last_table_id = self.model.insert_caption(self.collection_id, self.last_gruppa_id, name)
+                last = self.get_last_id_for_table()
+                self.last_table_id = self.model.insert_caption(self.collection_id, last, name)
                 next_row = self.parse_unit_position(table, c_row)
                 return next_row
+            else:
+                name = self.check_gruppa(text_all)
+                if name:
+                    last = self.get_last_id_for_table()
+                    self.last_gruppa_id = self.model.insert_caption(self.collection_id, self.last_razdel_id, name)
+                    next_row = self.parse_unit_position(table, c_row - 1)
+                    return next_row - 1
         return len(rows)
 
     def parse_caption(self, table):
@@ -176,3 +186,8 @@ class ParseMaterials:
             except Exception as e:
                 continue
             continue_n = self.check_captions(rows, row, table) - row
+
+    def get_last_id_for_table(self):
+        if not self.last:
+            print('ERROR self.last == None')
+        return self.last
