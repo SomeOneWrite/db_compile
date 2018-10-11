@@ -186,6 +186,7 @@ class ParseMaterials:
             except Exception as e:
                 continue
             continue_n = self.check_captions(rows, row, table) - row
+            self.model.commit()
 
     def get_last_id_for_table(self):
         if not self.last:

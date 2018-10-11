@@ -37,6 +37,6 @@ class FolderWalker:
                     self.threads_data.append([os.path.join(folder, file), file, dir_id, self.current_collection_type, self.current_prefix])
                 continue
             if os.path.isdir(os.path.join(folder, file)):
-                #self.last_dir_id = self.model.insert_dir(dir_id, file)
+                self.last_dir_id = self.model.insert_dir(dir_id, file)
                 self.walk(os.path.join(folder, file), self.last_dir_id)
         return self.threads_data

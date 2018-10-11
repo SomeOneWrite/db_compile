@@ -30,6 +30,7 @@ class ParseMachines:
                 cells = rows[row].cells
             except Exception as e:
                 continue
+            self.model.commit()
             for cell in range(0, len(cells)):
                 cells = rows[row].cells
                 text = cells[cell].text
